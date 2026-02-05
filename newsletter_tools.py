@@ -1183,32 +1183,33 @@ def publish_feishu_report(report_title, markdown_content, chat_id):
     print(f"✅ Markdown 转换成功，共 {len(blocks)} 个 blocks")
     
     # =================================================
-    # 步骤 3: 使用简单的方法写入内容
+    # 步骤 3: 使用转换好的 blocks 写入文档内容
     # =================================================
     print("📝 正在写入文档内容...")
     
-    # 简化方法：直接添加文本内容
     try:
-        # 添加文本内容
-        text_content_req = CreateDocumentBlockChildrenRequest.builder() \
-            .document_id(document_id) \
-            .block_id(document_id) \
-            .request_body(CreateDocumentBlockChildrenRequestBody.builder()
-                .children([TextElement.builder()
-                    .text_run(TextRun.builder()
-                        .content(markdown_content[:8000])  # 限制长度
-                        .build())
-                    .build()])
-                .build()) \
-            .build()
+        # 将 blocks 分批写入，避免单次请求过大
+        batch_size = 50
+        for i in range(0, len(blocks), batch_size):
+            batch = blocks[i:i + batch_size]
+            
+            # 直接使用转换好的 block 对象
+            batch_req = CreateDocumentBlockChildrenRequest.builder() \
+                .document_id(document_id) \
+                .block_id(document_id) \
+                .request_body(CreateDocumentBlockChildrenRequestBody.builder()
+                    .children(batch)
+                    .build()) \
+                .build()
+            
+            batch_resp = client.docx.v1.document_block_children.create(batch_req)
+            
+            if not batch_resp.success():
+                print(f"⚠️ 批次写入失败 (批次 {i//batch_size + 1}): {batch_resp.code} - {batch_resp.msg}")
+            else:
+                print(f"✅ 批次写入成功 (批次 {i//batch_size + 1}): {len(batch)} 个 blocks")
         
-        add_resp = client.docx.v1.document_block_children.create(text_content_req)
-        
-        if add_resp.success():
-            print(f"✅ 文档内容写入成功")
-        else:
-            print(f"⚠️ 文档内容写入失败: {add_resp.code} - {add_resp.msg}")
-            print("📝 跳过内容写入，继续发送通知...")
+        print(f"✅ 文档内容写入完成，共 {len(blocks)} 个 blocks")
             
     except Exception as e:
         print(f"⚠️ 写入文档内容时出错: {e}")
@@ -1261,20 +1262,20 @@ def publish_feishu_report(report_title, markdown_content, chat_id):
             .content(json.dumps(card_content)) \
             .build()) \
         .build()
-    # 测试需要，暂时注释发送飞书群组代码
-    # try:
-    #     msg_resp = client.im.v1.message.create(msg_req)
+
+    try:
+        msg_resp = client.im.v1.message.create(msg_req)
         
-    #     if msg_resp.success():
-    #         print("✅ 消息推送成功")
-    #     else:
-    #         print(f"⚠️ 消息推送失败: {msg_resp.code} - {msg_resp.msg}")
-    #         print("📝 仍然返回文档URL...")
-    # except Exception as e:
-    #     print(f"⚠️ 发送消息时出错: {e}")
-    #     print("📝 仍然返回文档URL...")
+        if msg_resp.success():
+            print("✅ 消息推送成功")
+        else:
+            print(f"⚠️ 消息推送失败: {msg_resp.code} - {msg_resp.msg}")
+            print("📝 仍然返回文档URL...")
+    except Exception as e:
+        print(f"⚠️ 发送消息时出错: {e}")
+        print("📝 仍然返回文档URL...")
     
-    # 关键：始终返回文档URL，即使内容写入或消息推送失败
+    关键：始终返回文档URL，即使内容写入或消息推送失败
     print(f"🎉 飞书文档发布完成!")
     print(f"📄 文档链接: {doc_url}")
     return doc_url
