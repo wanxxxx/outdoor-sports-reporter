@@ -890,7 +890,7 @@ def _process_batch_with_ai(client: OpenAI, batch: List[Dict], batch_index: int) 
     
     prompt = f"""
 # Role
-你是一名资深的**户外极限运动编辑**，精通登山（Alpinism）、攀岩（Rock Climbing）、徒步等领域的专业知识和术语。你的任务是批量处理多篇文章，提取每篇文章的核心信息并生成周报素材。
+你是一名资深的**户外极限运动编辑 + 专注于“户外文化观察”和“影像美学”的自媒体（文章/播客）**，精通登山、攀岩、徒步等领域的专业知识和术语。你的任务是批量处理多篇文章，提取每篇文章的核心信息并生成周报素材。
 
 # Input Data
 以下是 {len(batch)} 篇户外运动相关文章，请逐个分析：
@@ -902,28 +902,35 @@ def _process_batch_with_ai(client: OpenAI, batch: List[Dict], batch_index: int) 
 
 对于每篇文章，返回以下结构的JSON对象：
 {{
-    "chinese_title": "中文标题（专业术语翻译）",
-    "summary": "原文语言的核心事件概括（人物+地点+成就）",
-    "chinese_summary": "中文核心事件概括（专业术语）", 
+    "chinese_title": "对标题进行中文翻译）",
+    "summary": "核心事件概括（人物+地点+成就），要求使用原文语言",
+    "chinese_summary": "若summary为中文则赋值为summary；否则，对summary进行中文翻译", 
     "key_persons": ["关键人物1", "关键人物2"],
-    "location": "事件地点",
-    "event_date": "事件时间"
+    "location": "事件地点，使用原文。无则返回空",
+    "event_date": "事件时间",
+    "key_person_bios": {{
+        "相关人物英文原名": "一句话中文深度简介（背景、成就、风格）"
+    }},
+    "location_context": "事件地点介绍",
+    "curated_angles": {{
+        "选题角度1": "选题内容"
+    }}
 }}
 
 # Output Format
-必须返回纯净的JSON数组格式，**严禁**使用Markdown代码块。
+翻译时，注意户外运动专业术语的翻译
+必须返回纯净的JSON数组格式，严禁使用Markdown代码块。
+key_persons，使用原文人名，不得进行翻译
+key_person_bios，要求对key_persons的每个人物，用一句话中文进行简介（背景、成就、风格）
+location_context：如果没有事件地点则为空。如果事件地点是山峰或攀岩线路，必须补充其攀登历史、首攀信息以及难度等级等；如果是普通地点，补充其地理或户外文化背景。",
+curated_angles：请为用户生成3个深度选题角度。
+   - **思考维度**：请从“影像美学”、“探险伦理”、“商业与纯粹的冲突”、“人物内心”、“极限运动的社会隐喻”等角度发散。
+   - **格式要求**：每个角度请用【标签】：具体描述的形式。
+   - **示例**：
+     - "影像分析：分析摄影师 Jimmy Chin 如何利用广角镜头表现 Meru 鲨鱼鳍的压迫感"
+     - "文化观察：从这次商业登山事故，看‘保姆式登山’对阿肯色州探险文化的侵蚀"
+     - "播客话题：当赞助商要求‘必须登顶’时，攀登者的心理博弈"
 
-示例：
-[
-{{
-    "chinese_title": "亚历克斯·霍诺德完成首攀",
-    "summary": "Alex Honnold completed first ascent...",
-    "chinese_summary": "亚历克斯·霍诺德完成了...",
-    "key_persons": ["Alex Honnold"],
-    "location": "El Capitan",
-    "event_date": "2023-10-12"
-}}
-]
 """
     
     try:
@@ -973,8 +980,10 @@ def _process_batch_with_ai(client: OpenAI, batch: List[Dict], batch_index: int) 
                     'summary': result.get('summary', article.get('content_text', '')[:200] + '...'),
                     'chinese_summary': result.get('chinese_summary', result.get('summary', article.get('content_text', '')[:200] + '...')),
                     'key_persons': result.get('key_persons', []),
+                    'key_person_bios': result.get('key_person_bios', {}),
                     'location': result.get('location', '未知地点'),
-                    'event_date': result.get('event_date', ''),
+                    'location_context': result.get('location_context', ''),
+                    'curated_angles': result.get('curated_angles', []),
                     'url': article.get('url', ''),
                     'date': article.get('date', ''),
                     'site': article.get('site', ''),
@@ -1037,7 +1046,7 @@ def _generate_markdown(articles: List[Dict]) -> str:
     markdown_lines.append(f'共收录 {len(articles)} 篇文章\n')
     
     # 提取搜索的网站列表
-    source_sites = list(set(article.get('site', '') for article in articles if article.get('site')))
+    source_sites = list(set(article.get('site') for article in articles if isinstance(article, dict) and article.get('site')))
     if source_sites:
         markdown_lines.append('\n## 搜索来源网站\n')
         for site in source_sites:
@@ -1058,6 +1067,37 @@ def _generate_markdown(articles: List[Dict]) -> str:
         if article.get('key_persons'):
             persons_text = '、'.join(article['key_persons'])
             markdown_lines.append(f'**关键人物**: {persons_text}\n')
+            
+            # 为每个关键人物生成搜索链接
+            for person in article['key_persons']:
+                person_encoded = person.replace(' ', '+')
+                search_url = f"https://www.google.com/search?q={person_encoded}+outdoor"
+                markdown_lines.append(f'- [{person}]({search_url})\n')
+            
+            if article.get('key_person_bios'):
+                for person_name, bio_text in article['key_person_bios'].items():
+                    markdown_lines.append(f'  - **{person_name}**: {bio_text}\n')
+            else:
+                markdown_lines.append(f'  - **人物简介**: 无\n')
+        else:
+            markdown_lines.append(f'**关键人物**: 无\n')
+        
+        if article.get('location_context'):
+            markdown_lines.append(f'**地点背景与历史**: {article["location_context"]}\n')
+        else:
+            markdown_lines.append(f'**地点背景与历史**: 无\n')
+        
+        if article.get('curated_angles'):
+            angles = article['curated_angles']
+            if isinstance(angles, dict):
+                angles_list = list(angles.values())
+            else:
+                angles_list = angles
+            markdown_lines.append(f'**选题策划角度**:\n')
+            for angle in angles_list:
+                markdown_lines.append(f'  - {angle}\n')
+        else:
+            markdown_lines.append(f'**选题策划角度**: 无\n')
         
         markdown_lines.append(f'\n**摘要**: {article["summary"]}\n')
         
