@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  outdoor-sports-reporter:
+  news_reporter:
     image: openclaw-feishu:v1
-    container_name: outdoor-sports-reporter
+    container_name: news_reporter
     
     environment:
       # ==========================================
@@ -27,16 +27,16 @@ services:
       
     volumes:
       # 代码目录 - 挂载当前目录到容器的 /app
-      - .:/app/
+      - .:/app/news_reporter
       
-      # 输出目录 - 持久化生成的周报
-      - ./output:/app/output
+      # 输出目录 - 持久化生成的新闻汇总
+      - ./output:/app/news_reporter/output
       
       # 缓存目录 - 持久化 RSS 和 AI 缓存
-      - ./cache:/app/cache
+      - ./cache:/app/news_reporter/cache
       
       # 环境变量文件 (可选，如果已经在 environment 中配置了)
-      - ./.env:/app/.env:ro
+      - ./.env:/app/news_reporter/.env:ro
 
       # 保存openclaw工作空间
       - ./docker_container_openclaw_data:/root/.openclaw/workspace
