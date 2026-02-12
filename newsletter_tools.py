@@ -890,47 +890,58 @@ def _process_batch_with_ai(client: OpenAI, batch: List[Dict], batch_index: int) 
     
     prompt = f"""
 # Role
-你是一名资深的**户外极限运动编辑 + 专注于“户外文化观察”和“影像美学”的自媒体（文章/播客）**，精通登山、攀岩、徒步等领域的专业知识和术语。你的任务是批量处理多篇文章，提取每篇文章的核心信息并生成周报素材。
+你是一名资深的**户外文化主编**。你的核心能力是**"透过现象看本质"**。
+你精通登山、攀岩、滑雪等垂直领域，擅长从简单的行业新闻中发掘出适合制作**深度播客**或**长文分析**的选题。
+# Task
+分析以下 {len(articles_to_process)} 篇户外文章。请根据每篇文章的**具体内容属性**，灵活匹配最合适的选题角度。
 
 # Input Data
-以下是 {len(batch)} 篇户外运动相关文章，请逐个分析：
-
 {batch_content}
 
-# Goals
-请为每篇文章提取以下信息，严格按照JSON格式返回：
+# Goals (Adaptive Angles)
+在生成 `curated_angles` 时，请遵循以下**自适应逻辑**，不要生搬硬套：
 
-对于每篇文章，返回以下结构的JSON对象：
-{{
-    "chinese_title": "对标题进行中文翻译）",
-    "summary": "核心事件概括（人物+地点+成就），要求使用原文语言",
-    "chinese_summary": "若summary为中文则赋值为summary；否则，对summary进行中文翻译", 
-    "key_persons": ["关键人物1", "关键人物2"],
-    "location": "事件地点，使用原文。无则返回空",
-    "event_date": "事件时间",
-    "key_person_bios": {{
-        "相关人物英文原名": "一句话中文深度简介（背景、成就、风格）"
-    }},
-    "location_context": "事件地点介绍",
-    "curated_angles": {{
-        "选题角度1": "选题内容"
-    }}
-}}
+1. **如果是【攀登/探险新闻】**：
+   - 关注：**心理博弈**（恐惧与勇气）、**风格之争**（阿式 vs 喜式）、**历史回溯**（与前人路线的对比）、**技术细节**。
+2. **如果是【影像/纪录片新闻】**：
+   - 关注：**叙事视角**、**拍摄伦理**、**美学风格**、**导演意图**。
+3. **如果是【事故/悲剧】**：
+   - 关注：**风险管理**、**探险伦理**、**救援体系**、**生命反思**。
+4. **如果是【商业/装备/行业新闻】**：
+   - 关注：**消费主义**、**环保困境**、**品牌文化**、**大众化与硬核的冲突**。
+
+**要求：**
+- 至少返回 3 个角度。
+- 每个角度的【标签】由你根据内容**自动生成**（例如：【商业观察】、【技术分析】、【历史钩沉】、【心理探索】等），不要局限于固定的词汇。
 
 # Output Format
-翻译时，注意户外运动专业术语的翻译
-必须返回纯净的JSON数组格式，严禁使用Markdown代码块。
-key_persons，使用原文人名，不得进行翻译
-key_person_bios，要求对key_persons的每个人物，用一句话中文进行简介（背景、成就、风格）
-location_context：如果没有事件地点则为空。如果事件地点是山峰或攀岩线路，必须补充其攀登历史、首攀信息以及难度等级等；如果是普通地点，补充其地理或户外文化背景。",
-curated_angles：请为用户生成3个深度选题角度。
-   - **思考维度**：请从“影像美学”、“探险伦理”、“商业与纯粹的冲突”、“人物内心”、“极限运动的社会隐喻”等角度发散。
-   - **格式要求**：每个角度请用【标签】：具体描述的形式。
-   - **示例**：
-     - "影像分析：分析摄影师 Jimmy Chin 如何利用广角镜头表现 Meru 鲨鱼鳍的压迫感"
-     - "文化观察：从这次商业登山事故，看‘保姆式登山’对阿肯色州探险文化的侵蚀"
-     - "播客话题：当赞助商要求‘必须登顶’时，攀登者的心理博弈"
+请严格按照以下 JSON 结构返回一个**数组 (Array)**。严禁包含 Markdown 标记（如 ```json）。
 
+[
+  {{
+    "chinese_title": "String, 标题的中文翻译（信达雅，使用专业术语）",
+    "summary": "String, 用中文一句话概括核心事件（人物+地点+成就/事故）",
+    "key_persons": [
+      "String, 关键人物原名"
+    ],
+    "key_person_bios": [
+      "String, 关键人物的中文一句话简介 (必填！如果文中没写，请利用你的知识补充该人物的代表作、风格或历史地位)"
+    ],
+    "location_name": "String, 事件地点 (英文或中文)",
+    "location_context": "String, 地点背景 (必填！如果文中没写，请补充该地点的地理位置、攀登历史、难度等级或户外文化意义)",
+    "event_date": "String, 事件发生时间 (如 '2023-10' 或 '近期')",
+    "curated_angles": [
+      "String, 选题角度1 (格式：【标签】+ 深度描述)",
+      "String, 选题角度2 (格式：【标签】+ 深度描述)",
+      "String, 选题角度3 (格式：【标签】+ 深度描述)"
+    ]
+  }}
+]
+
+# Constraints
+1. `key_persons` 和 `key_person_bios` 必须是字符串数组，且长度相同，顺序一一对应。例如：key_persons: ["Alex Honnold", "Tommy Caldwell"], key_person_bios: ["美国攀岩运动员，以无保护独攀闻名", "美国攀岩运动员，以大岩壁攀登闻名"]。如果文章没有提及人物，两个数组都返回空数组 `[]`。
+2. `location_context` 不能为空字符串。
+3. `curated_angles` 必须包含 3 个不同的切入点。
 """
     
     try:
@@ -951,16 +962,22 @@ curated_angles：请为用户生成3个深度选题角度。
         
         result_text = response.choices[0].message.content.strip()
         
+        logger.info(f"🤖 AI返回原始内容长度: {len(result_text)} 字符")
+        logger.info(f"🤖 AI返回原始内容: {result_text}")
+        
         # 解析JSON结果
         import json
         results = json.loads(result_text)
         
+        logger.info(f"🔍 解析后的results类型: {type(results)}")
+        logger.info(f"🔍 解析后的results内容: {str(results)[:1000]}...")
+        
         # 确保结果是数组格式
-        if isinstance(results, dict) and 'articles' in results:
-            results = results['articles']
-        elif not isinstance(results, list):
+        if not isinstance(results, list):
             logger.warning(f"批次 {batch_index} 返回格式异常，尝试修复...")
             results = [results] if not isinstance(results, list) else results
+        
+        logger.info(f"🔍 得到 {len(results)} 篇文章")
         
         # 将结果映射回原始文章数据
         # 处理AI返回的结果
@@ -978,11 +995,11 @@ curated_angles：请为用户生成3个深度选题角度。
                     'original_title': article.get('title', ''),
                     'chinese_title': result.get('chinese_title', article.get('title', '')),
                     'summary': result.get('summary', article.get('content_text', '')[:200] + '...'),
-                    'chinese_summary': result.get('chinese_summary', result.get('summary', article.get('content_text', '')[:200] + '...')),
                     'key_persons': result.get('key_persons', []),
-                    'key_person_bios': result.get('key_person_bios', {}),
-                    'location': result.get('location', '未知地点'),
+                    'key_person_bios': result.get('key_person_bios', []),
+                    'location_name': result.get('location_name', '未知地点'),
                     'location_context': result.get('location_context', ''),
+                    'event_date': result.get('event_date', article.get('date', '')),
                     'curated_angles': result.get('curated_angles', []),
                     'url': article.get('url', ''),
                     'date': article.get('date', ''),
@@ -1015,10 +1032,12 @@ curated_angles：请为用户生成3个深度选题角度。
                 'original_title': article.get('title', ''),
                 'chinese_title': article.get('title', ''),
                 'summary': article.get('content_text', '')[:200] + '...',
-                'chinese_summary': article.get('content_text', '')[:200] + '...',
                 'key_persons': [],
-                'location': '未知地点',
-                'event_date': '',
+                'key_person_bios': [],
+                'location_name': '未知地点',
+                'location_context': '',
+                'event_date': article.get('date', ''),
+                'curated_angles': [],
                 'url': article.get('url', ''),
                 'date': article.get('date', ''),
                 'site': article.get('site', ''),
@@ -1064,45 +1083,44 @@ def _generate_markdown(articles: List[Dict]) -> str:
         
         markdown_lines.append(f'**链接**: {article["url"]}\n')
         
-        if article.get('key_persons'):
-            persons_text = '、'.join(article['key_persons'])
-            markdown_lines.append(f'**关键人物**: {persons_text}\n')
-            
-            # 为每个关键人物生成搜索链接
-            for person in article['key_persons']:
-                person_encoded = person.replace(' ', '+')
-                search_url = f"https://www.google.com/search?q={person_encoded}+outdoor"
-                markdown_lines.append(f'- [{person}]({search_url})\n')
-            
-            if article.get('key_person_bios'):
-                for person_name, bio_text in article['key_person_bios'].items():
-                    markdown_lines.append(f'  - **{person_name}**: {bio_text}\n')
+        if article.get('event_date'):
+            markdown_lines.append(f'**事件日期**: {article["event_date"]}\n')
+        
+        if article.get('location_name'):
+            location_name = article["location_name"]
+            location_context = article.get("location_context", "")
+            if location_context:
+                markdown_lines.append(f'**地点**: {location_name}。{location_context}\n')
             else:
-                markdown_lines.append(f'  - **人物简介**: 无\n')
+                markdown_lines.append(f'**地点**: {location_name}\n')
+        else:
+            markdown_lines.append(f'**地点**: 无\n')
+        
+        if article.get('key_persons'):
+            markdown_lines.append(f'**关键人物**:\n')
+            key_persons = article['key_persons']
+            key_person_bios = article.get('key_person_bios', [])
+            for i, name in enumerate(key_persons):
+                person_encoded = name.replace(' ', '+')
+                search_url = f"https://www.google.com/search?q={person_encoded}+outdoor"
+                bio = key_person_bios[i] if i < len(key_person_bios) else ''
+                if bio:
+                    markdown_lines.append(f'- [{name}]({search_url})：{bio}\n')
+                else:
+                    markdown_lines.append(f'- [{name}]({search_url})\n')
+            markdown_lines.append('\n')
         else:
             markdown_lines.append(f'**关键人物**: 无\n')
         
-        if article.get('location_context'):
-            markdown_lines.append(f'**地点背景与历史**: {article["location_context"]}\n')
-        else:
-            markdown_lines.append(f'**地点背景与历史**: 无\n')
-        
         if article.get('curated_angles'):
             angles = article['curated_angles']
-            if isinstance(angles, dict):
-                angles_list = list(angles.values())
-            else:
-                angles_list = angles
-            markdown_lines.append(f'**选题策划角度**:\n')
-            for angle in angles_list:
-                markdown_lines.append(f'  - {angle}\n')
+            markdown_lines.append(f'**选题推荐**:\n')
+            for angle_item in angles:
+                markdown_lines.append(f'  - {angle_item}\n')
         else:
-            markdown_lines.append(f'**选题策划角度**: 无\n')
+            markdown_lines.append(f'**选题推荐**: 无\n')
         
         markdown_lines.append(f'\n**摘要**: {article["summary"]}\n')
-        
-        if article.get('chinese_summary') and article.get('chinese_summary') != article.get('summary'):
-            markdown_lines.append(f'\n*中文摘要*: {article["chinese_summary"]}\n')
         
         markdown_lines.append('\n---\n')
     
@@ -1356,18 +1374,18 @@ def publish_feishu_report(report_title, markdown_content, chat_id):
             .content(json.dumps(card_content)) \
             .build()) \
         .build()
-    # 测试需要，暂时注释发送飞书群组代码
-    # try:
-    #     msg_resp = client.im.v1.message.create(msg_req)
+
+    try:
+        msg_resp = client.im.v1.message.create(msg_req)
         
-    #     if msg_resp.success():
-    #         print("✅ 消息推送成功")
-    #     else:
-    #         print(f"⚠️ 消息推送失败: {msg_resp.code} - {msg_resp.msg}")
-    #         print("📝 仍然返回文档URL...")
-    # except Exception as e:
-    #     print(f"⚠️ 发送消息时出错: {e}")
-    #     print("📝 仍然返回文档URL...")
+        if msg_resp.success():
+            print("✅ 消息推送成功")
+        else:
+            print(f"⚠️ 消息推送失败: {msg_resp.code} - {msg_resp.msg}")
+            print("📝 仍然返回文档URL...")
+    except Exception as e:
+        print(f"⚠️ 发送消息时出错: {e}")
+        print("📝 仍然返回文档URL...")
     
     # 关键：始终返回文档URL，即使内容写入或消息推送失败
     print(f"🎉 飞书文档发布完成!")

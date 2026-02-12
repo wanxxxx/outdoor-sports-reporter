@@ -159,7 +159,7 @@ def run_quick_test(chat_id: str = None) -> Optional[str]:
         print("❌ AI 处理失败")
         return None
     
-    md_file = f'test/output/ai_{start_date}_to_{end_date}.md'
+    md_file = 'test/output/ai_test_output.md'
     
     with open(md_file, 'w', encoding='utf-8') as f:
         f.write(markdown_content)
