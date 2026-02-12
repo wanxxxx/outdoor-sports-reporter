@@ -1005,7 +1005,7 @@ def process_articles_with_ai(articles_list: List[Dict],
         url = article.get('url', '')
         cached_result = load_ai_from_cache(url)
         if cached_result:
-            logger.info(f"🚀 AI缓存命中: {url}")
+            # logger.info(f"🚀 AI缓存命中: {url}")
             cached_articles.append(cached_result)
         else:
             articles_to_process.append(article)

@@ -27,7 +27,7 @@ services:
       
     volumes:
       # 代码目录 - 挂载当前目录到容器的 /app
-      - .:/app
+      - .:/app/
       
       # 输出目录 - 持久化生成的周报
       - ./output:/app/output
