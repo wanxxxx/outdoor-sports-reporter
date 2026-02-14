@@ -1,5 +1,5 @@
 version: '3.8'
-
+name: news_reporter
 services:
   news_reporter:
     image: openclaw-feishu:v1

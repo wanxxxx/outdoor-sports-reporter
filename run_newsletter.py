@@ -145,6 +145,7 @@ def run_newsletter_task(config: NewsConfig,
     
     import json
     output_file = f'output/fetch_{config.name}_{actual_start_date}_to_{actual_end_date}.json'
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(articles, f, ensure_ascii=False, indent=2)
     print(f"📄 原始文章数据已保存到: {output_file}")
@@ -160,6 +161,7 @@ def run_newsletter_task(config: NewsConfig,
         return None
     
     md_output_file = f'output/ai_{config.name}_{actual_start_date}_to_{actual_end_date}.md'
+    os.makedirs(os.path.dirname(md_output_file), exist_ok=True)
     with open(md_output_file, 'w', encoding='utf-8') as f:
         f.write(markdown_content)
     print(f"📄 Markdown 新闻汇总已保存到: {md_output_file}")
@@ -257,7 +259,7 @@ def run_quick_test(config: NewsConfig = None, chat_id: str = None) -> Optional[s
         return None
     
     md_file = f'test/output/ai_{config.name}_test_output.md'
-    
+    os.makedirs(os.path.dirname(md_file), exist_ok=True)
     with open(md_file, 'w', encoding='utf-8') as f:
         f.write(markdown_content)
     print(f"✅ Markdown 已保存到: {md_file}")

@@ -1604,19 +1604,19 @@ def publish_feishu_report(report_title, markdown_content, chat_id,
             .build()) \
         .build()
 
-    # try:
-    #     msg_resp = client.im.v1.message.create(msg_req)
+    try:
+        msg_resp = client.im.v1.message.create(msg_req)
         
-    #     if msg_resp.success():
-    #         print("✅ 消息推送成功")
-    #     else:
-    #         print(f"⚠️ 消息推送失败: {msg_resp.code} - {msg_resp.msg}")
-    #         print("📝 仍然返回文档URL...")
-    # except Exception as e:
-    #     print(f"⚠️ 发送消息时出错: {e}")
-    #     print("📝 仍然返回文档URL...")
+        if msg_resp.success():
+            print("✅ 消息推送成功")
+        else:
+            print(f"⚠️ 消息推送失败: {msg_resp.code} - {msg_resp.msg}")
+            print("📝 仍然返回文档URL...")
+    except Exception as e:
+        print(f"⚠️ 发送消息时出错: {e}")
+        print("📝 仍然返回文档URL...")
     
-    # # 关键：始终返回文档URL，即使内容写入或消息推送失败
-    # print(f"🎉 飞书文档发布完成!")
-    # print(f"📄 文档链接: {doc_url}")
+    # 关键：始终返回文档URL，即使内容写入或消息推送失败
+    print(f"🎉 飞书文档发布完成!")
+    print(f"📄 文档链接: {doc_url}")
     return doc_url

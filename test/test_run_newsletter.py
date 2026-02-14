@@ -1,10 +1,11 @@
 import os
 import sys
 import unittest
+import tempfile
+import shutil
 from unittest.mock import Mock, patch, MagicMock
 from datetime import date, timedelta
 
-# 添加父目录到Python路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from run_newsletter import (
@@ -43,8 +44,8 @@ class TestRunNewsletter(unittest.TestCase):
                 "https://test.com": "https://test.com/rss"
             })
             self.assertEqual(config.feishu_collaborator_openids, ["openid1", "openid2"])
-            self.assertIn("户外运动周报", config.report_title_template)
-            self.assertEqual(config.report_header, "# 户外运动周报\n")
+            self.assertIn("户外运动新闻汇总", config.report_title_template)
+            self.assertEqual(config.report_header, "# 户外运动新闻汇总\n")
             self.assertEqual(config.cache_prefix, "outdoor_")
             
         finally:
@@ -207,23 +208,83 @@ class TestRunNewsletter(unittest.TestCase):
     @patch('run_newsletter.process_articles_with_ai')
     def test_run_quick_test_ai_failure(self, mock_process, mock_exists, mock_json_load):
         """测试快速测试模式 - AI处理失败"""
-        # 配置mock
         mock_exists.return_value = True
-        
-        # 模拟JSON加载
         mock_json_load.return_value = []
-        
-        # 模拟AI处理失败
         mock_process.return_value = ''
         
-        # 创建配置
         config = NewsConfig(name="test_news")
-        
-        # 调用函数
         result = run_quick_test(config=config)
-        
-        # 验证结果
         self.assertIsNone(result)
+
+
+class TestDirectoryAutoCreation(unittest.TestCase):
+    """测试目录自动创建功能"""
+    
+    def setUp(self):
+        """测试前准备：创建临时目录"""
+        self.test_dir = tempfile.mkdtemp()
+        self.original_cwd = os.getcwd()
+    
+    def tearDown(self):
+        """测试后清理：删除临时目录"""
+        os.chdir(self.original_cwd)
+        if os.path.exists(self.test_dir):
+            shutil.rmtree(self.test_dir)
+    
+    def test_output_directory_auto_creation(self):
+        """测试 output 目录不存在时自动创建"""
+        output_dir = os.path.join(self.test_dir, 'output')
+        output_file = os.path.join(output_dir, 'test_file.json')
+        
+        self.assertFalse(os.path.exists(output_dir))
+        
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write('{"test": "data"}')
+        
+        self.assertTrue(os.path.exists(output_dir))
+        self.assertTrue(os.path.exists(output_file))
+    
+    def test_nested_output_directory_auto_creation(self):
+        """测试嵌套 output 目录不存在时自动创建"""
+        output_dir = os.path.join(self.test_dir, 'output', 'nested', 'deep')
+        output_file = os.path.join(output_dir, 'test_file.md')
+        
+        self.assertFalse(os.path.exists(output_dir))
+        
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write('# Test Markdown')
+        
+        self.assertTrue(os.path.exists(output_dir))
+        self.assertTrue(os.path.exists(output_file))
+    
+    def test_test_output_directory_auto_creation(self):
+        """测试 test/output 目录不存在时自动创建"""
+        output_dir = os.path.join(self.test_dir, 'test', 'output')
+        output_file = os.path.join(output_dir, 'ai_test_output.md')
+        
+        self.assertFalse(os.path.exists(output_dir))
+        
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write('# Test Output')
+        
+        self.assertTrue(os.path.exists(output_dir))
+        self.assertTrue(os.path.exists(output_file))
+    
+    def test_existing_directory_no_error(self):
+        """测试目录已存在时不会报错"""
+        output_dir = os.path.join(self.test_dir, 'output')
+        os.makedirs(output_dir, exist_ok=True)
+        
+        output_file = os.path.join(output_dir, 'test_file.json')
+        
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write('{"test": "data"}')
+        
+        self.assertTrue(os.path.exists(output_file))
 
 
 if __name__ == "__main__":
